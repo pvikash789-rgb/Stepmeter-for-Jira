@@ -13,3 +13,6 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Phase 1 output (from real sites)
+phase1/output/
