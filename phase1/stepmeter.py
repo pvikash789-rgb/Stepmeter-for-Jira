@@ -324,7 +324,7 @@ def analyse(rule, summary, jira, now):
         chain.append(item)
 
     res = {"name": name, "enabled": state != "DISABLED", "trigger_kind": tkind, "chain": chain,
-           "scope": keys, "since": f"{since:%d %b %Y}", "days": days, "findings": [], "notes": [],
+           "scope": keys, "since": f"{since.astimezone(jira.tz):%d %b %Y}", "days": days, "findings": [], "notes": [],
            "runs": None, "runs_stopped": None, "est_steps": None, "est_wasted": None, "fix": None}
     if not res["enabled"]:
         res["findings"].append("Turned off, so it uses no steps.")
@@ -498,7 +498,7 @@ def render(site, results):
                 chips.append(f"<span class='chip'>{esc(ch['label'])}</span>")
         nums = []
         if r["runs"] is not None:
-            nums.append(f"{r['runs']:,} runs since {r['since']}")
+            nums.append(f"{r['runs']:,} run{'' if r['runs'] == 1 else 's'} since {r['since']}")
         if r["est_steps"] is not None:
             nums.append(f"{r['est_steps']:,} steps")
         if r["est_wasted"]:
@@ -578,7 +578,7 @@ def main():
         shapes.append({"name": r["name"], "trigger_type": body.get("trigger", {}).get("type"), "checks": checks,
                        "trigger": shape(body.get("trigger")), "components": [shape(c) for c in body.get("components") or []]})
         est = f"{r['est_steps']} steps" if r["est_steps"] is not None else "steps unknown"
-        runs = f"{r['runs']} runs" if r["runs"] is not None else ""
+        runs = (f"{r['runs']} run" + ("" if r["runs"] == 1 else "s")) if r["runs"] is not None else ""
         wasted = f"{r['est_wasted']} wasted" if r["est_wasted"] else ""
         print(f"  {r['name'][:30]:30} {runs:>9} {est:>13} {wasted:>11}  {'FIX' if r['fix'] else ''}")
 
