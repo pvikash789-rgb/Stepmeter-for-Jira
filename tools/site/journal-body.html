@@ -1,0 +1,151 @@
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Build journal · Vikash Kumar · Work in progress</div>
+  <h1>{{NAME}}</h1>
+  <p class="lede">A tool for Jira and Confluence Cloud admins that shows which automation rules will cost the most under per-step billing, and how to rewrite them to cost less.</p>
+  <div class="facts">
+    <span class="fact">Started <b>8 Oct 2026</b></span>
+    <span class="fact">Billing change <b>3 Dec 2026</b></span>
+    <span class="fact">Current phase <b>0 · Validation</b></span>
+  </div>
+  <p><a href="brief.html">Read the one-page brief</a> &middot; <a href="demo.html">See the demo report</a></p>
+</header>
+
+<section aria-labelledby="problem">
+  <h2 id="problem">The problem</h2>
+  <p>From 3 December 2026, Atlassian Cloud measures automation usage in steps. Each trigger, condition, action, branch and loop that runs counts as one step, including a trigger that finds nothing to act on. Steps come from a monthly allowance pooled across the organisation. Extra usage is billed at $0.50 per 1,000 steps and is switched on by default, and Enterprise plans move from unlimited automation to an allowance. If an admin switches extra usage off, rules pause when the allowance runs out, and events missed during the pause are not replayed.</p>
+  <p>Cost now depends on how each rule is built, not only on how often it runs. A daily scheduled rule that loops over 500 work items and edits each one uses at least 15,000 steps a month on its own. A rule triggered on every work item update uses a step each time it fires, even when its condition then stops it.</p>
+  <p>Atlassian Administration shows usage by meter and app, with forecasts, alerts and limits, and each space's Automation page has a Usage tab that lists its highest-usage flows with runs and estimated steps. What it doesn't show is how many of those steps went to runs that did nothing, or how to change a flow so it uses fewer. In my test site, 4 of one flow's 7 steps were spent on runs that stopped at a condition, and nothing on the Usage tab says so.</p>
+  <div class="callout">
+    <h3>What the tool will do</h3>
+    <p>For each automation flow, show how much of its step cost goes to runs that do nothing, point to the part of the flow that causes it, and suggest a rewrite with the expected saving, before anything is changed. Secrets inside flows, such as webhook URLs and headers, are stripped before anything is processed, and flow data isn't kept.</p>
+  </div>
+</section>
+
+<section aria-labelledby="discovery">
+  <h2 id="discovery">How I found it</h2>
+  <p>I wanted to build something real on Atlassian's platform rather than write about it. I set one rule for choosing the problem: it had to be useful and viable for real customers, whatever my own background.</p>
+  <div class="funnel">
+    <div class="stage"><div class="count">3</div><div><p>Early ideas in Jira Service Management and Rovo, each ruled out by research.</p><p class="sub">Details below. Atlassian ships quickly, and some data isn't open to outside apps.</p></div></div>
+    <div class="stage"><div class="count">~20</div><div><p>Ideas scouted across four areas: Jira and Product Discovery, Confluence and Loom, Jira Service Management, and Rovo with organisation admin.</p><p class="sub">Sources: public feature requests and their votes, Community threads, Marketplace apps and their installs, Atlassian documentation and release notes.</p></div></div>
+    <div class="stage"><div class="count">4</div><div><p>Passed three checks: evidence of demand, not already shipped by Atlassian, and data reachable through a public API.</p><p class="sub">Shortlist: this tool, an "I'm affected too" option on the customer portal (JSDCLOUD-1743, 491 votes), idea-to-delivery status sync for Product Discovery, and a broken-link checker for Confluence.</p></div></div>
+    <div class="stage"><div class="count">1</div><div><p>Chosen: automation step cost.</p><p class="sub">It has a fixed date, applies to every cloud organisation that uses automation, and its value can be measured in money.</p></div></div>
+  </div>
+</section>
+
+<section aria-labelledby="deadends">
+  <h2 id="deadends">Ideas I dropped and why</h2>
+  <div class="kills">
+    <div class="kill"><span class="tag">Already shipped</span><h3>AI request triage</h3><p class="why">Jira Service Management's Service Triage agent already suggests request type, urgency and priority.</p><p class="lesson">Check what exists before designing anything.</p></div>
+    <div class="kill"><span class="tag">No data access</span><h3>Agent governance view</h3><p class="why">Clear demand (ROVO-516), but there is no public API to list Rovo agents or read their usage.</p><p class="lesson">Demand isn't enough. Confirm the data is reachable.</p></div>
+    <div class="kill"><span class="tag">Already shipped</span><h3>Knowledge gap finder</h3><p class="why">Rovo's knowledge base skill in Jira Service Management, rolled out from April 2026, already does this. I shortlisted it before checking.</p><p class="lesson">The shipped check now comes first for every idea.</p></div>
+  </div>
+</section>
+
+<section aria-labelledby="approach">
+  <h2 id="approach">How I'm approaching the build</h2>
+  <ul>
+    <li><strong>Validate before building.</strong> A three-day spike with written stop criteria comes first. If the rule API doesn't expose rule structure, or admins already know which rules are expensive, I stop and move to the next idea on the shortlist.</li>
+    <li><strong>Be clear about estimates.</strong> No public API reports how often each rule runs, so run frequency is estimated. I'll compare the estimate with Atlassian's own usage figures and publish the difference.</li>
+    <li><strong>Treat secrets as a core requirement.</strong> The Rule Management API returns rule configuration in full, including values the UI masks (AUTO-2207). The tool strips them before processing and doesn't keep rule data.</li>
+    <li><strong>Real users before launch.</strong> 5 to 10 admins run it on their own sites before any public release.</li>
+    <li><strong>How I work.</strong> I use an AI assistant (Claude) for research and coding. Problem choice, product decisions and trade-offs are mine, and each is recorded with its reasoning in the decision log.</li>
+  </ul>
+</section>
+
+<section aria-labelledby="plan">
+  <h2 id="plan">Build plan</h2>
+  <div class="phases">
+    <div class="phase"><div class="when">Days 1 to 3<span class="pill now">In progress</span></div><div class="body"><h3>Phase 0 · Validate</h3><p>Done: test site with 9 flows covering the main cost patterns, step model checked against the Usage tab, API confirmed to return full flow structure. Remaining: interviews with 3 to 5 Jira admins.</p></div></div>
+    <div class="phase"><div class="when">Weeks 1 to 2<span class="pill next">Next</span></div><div class="body"><h3>Phase 1 · Cost engine</h3><p>Turn each rule into its components, count steps per run, estimate run frequency, and compare totals with real usage. Target: within about 20%.</p></div></div>
+    <div class="phase"><div class="when">Weeks 2 to 3<span class="pill next">Planned</span></div><div class="body"><h3>Phase 2 · Recommendations and report</h3><p>Rank expensive rules, show the cost in money, and suggest rewrites.</p></div></div>
+    <div class="phase"><div class="when">Week 4<span class="pill next">Planned</span></div><div class="body"><h3>Phase 3 · Beta</h3><p>5 to 10 admins run it on their own sites. Track savings found, accuracy and where they get confused.</p></div></div>
+    <div class="phase"><div class="when">Week 5<span class="pill next">Planned</span></div><div class="body"><h3>Phase 4 · Release</h3><p>Public release with a write-up and short demo, before 3 December.</p></div></div>
+  </div>
+</section>
+
+<section aria-labelledby="results">
+  <h2 id="results">Results so far</h2>
+  <div class="tablewrap">
+  <table class="metrics">
+    <thead><tr><th>Measure</th><th>Target</th><th>Actual</th></tr></thead>
+    <tbody>
+      <tr><td>Jira admins interviewed</td><td>3 to 5</td><td class="v">Not started</td></tr>
+      <tr><td>Estimate accuracy against real usage</td><td>Within ~20%</td><td class="v">56 of 57 steps on 17 runs, 7 flows (test site)</td></tr>
+      <tr><td>Beta sites</td><td>5 to 10</td><td class="v">0</td></tr>
+      <tr><td>Monthly savings found across beta sites</td><td>Report as found</td><td class="v">Not measured</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section aria-labelledby="journal">
+  <h2 id="journal">Journal</h2>
+  <div class="journal">
+    <article class="entry">
+      <div class="date">13 Oct 2026 · Day 5</div>
+      <h3>A first demo report and a one-page brief</h3>
+      <p>Built a first version of the report Stepmeter will give admins, using the test site's flows and run results: total steps, steps on runs that did nothing or failed, the cause in each flow's structure, and a suggested fix. On the test site, 12 of 57 steps (21%) went to runs that did nothing or failed, across three flows.</p>
+      <p>Wrote a one-page brief that sets out the findings and one idea for the Usage tab itself: a wasted-steps column with plain-language flags such as "edits before checking" and "fails every run".</p>
+    </article>
+    <article class="entry">
+      <div class="date">9 Oct 2026 · Day 1, mid-morning</div>
+      <h3>The API returns each flow's full structure</h3>
+      <p>Ran the spike script against the test site. It listed all 9 flows and fetched each one's configuration through the Automation Rule Management API, using a classic API token with basic authentication on the site address. My first run failed with HTTP 401 because of a typo in the email address, which a login check added to the script now catches.</p>
+      <p>The response includes what Stepmeter needs to estimate cost per run: each flow's state (enabled or disabled), the trigger type, and every component in order, with branches and their children nested. The trigger type distinguishes a broad "any update" trigger from a narrow field-change trigger, and a scheduled search from an event, which are the patterns behind most of the waste found so far.</p>
+      <p>Flow configuration from this API can include secrets in plain text (AUTO-2207), and the test site has a flow with a planted fake one. The script masks secret-looking values before saving, and a search of the saved files found no trace of it.</p>
+      <p>It does not include how often each flow runs. Run frequency will have to come from another source, which is the main open problem for Phase 1.</p>
+      <p>The web request flow has only one component in the API response, so its extra step on the Usage tab doesn't come from hidden structure. A follow-up test is running.</p>
+    </article>
+    <article class="entry">
+      <div class="date">9 Oct 2026 · Day 1, morning</div>
+      <h3>Loops are billed per work item, and the model holds</h3>
+      <p>Built four more flows overnight, each covering one cost pattern: a branch over sub-tasks, a daily scheduled search over 7 work items, a web request with a fake secret in it, and a flow that edits a work item before checking whether it should. I wrote down a step prediction for every run before Atlassian reported it.</p>
+      <p><strong>56 of 57 steps matched</strong> across 17 runs on 7 flows. The one miss was the web request flow: 3 steps where I predicted 2, on a run where the request failed. I haven't explained that yet.</p>
+      <p><strong>Branches and scheduled searches are billed per work item.</strong> The sub-task branch used 4 steps for 2 sub-tasks, not 3. The daily search used 8 steps per run, one for the trigger and one comment for each of the 7 matching work items. The audit log groups this work into one line per action, so the per-item cost isn't visible there.</p>
+      <p><strong>Some waste is labelled "Success".</strong> When the broad flow stopped at its condition, the audit log said "No actions performed". The flow that edits first and checks second stopped at the same condition on the same work item, but because its edit had already run, the audit log called it "Success". It used 3 steps, didn't do its job, and overwrote the work item's description on the way.</p>
+      <p>Across the test site, 6 of the broad flow's 15 steps went to runs that did nothing.</p>
+    </article>
+    <article class="entry">
+      <div class="date">8 Oct 2026 · Day 0, night</div>
+      <h3>First real data from the test site</h3>
+      <p>Built a test site with 30 work items and the first three flows: a simple one (created, then assign), a broad one (any update, then check for a <code>vip</code> label, then comment) and a narrow one (labels changed, then comment). Ran three tests that touched a <code>vip</code> item and a non-<code>vip</code> item.</p>
+      <p><strong>The step model matched exactly.</strong> Counting one step per trigger, condition and action that ran, I predicted 11 steps across 5 runs. The Usage tab reported 11: 2, 2 and 7.</p>
+      <p><strong>Atlassian already ranks flows by steps.</strong> Each space's Automation Usage tab has a "High usage flows" table with runs and estimated steps, sortable by steps. My assumption from the public documentation was wrong, which is what this phase was for. The tab also lags: it took about two hours to show the new runs.</p>
+      <p><strong>The gap is waste and the fix, not the ranking.</strong> The broad flow ran 3 times for 7 steps. Two runs stopped at the condition and did nothing, yet used 4 of the 7 steps. The audit log shows those runs as "No actions performed", but the Usage tab only shows the total. Telling an admin how much of a flow's cost is wasted, and how to rewrite it, needs both the flow's structure and its run results together.</p>
+      <p><strong>Decision:</strong> Stepmeter will focus on wasted steps and how to fix them, not on ranking flows (decision 11).</p>
+    </article>
+    <article class="entry">
+      <div class="date">8 Oct 2026 · Day 0, evening</div>
+      <h3>Phase 0 kit ready, building in public</h3>
+      <p>Set up a public <a href="{{REPO}}">GitHub repository</a> so the work is visible as it happens.</p>
+      <p>Wrote the Phase 0 kit: 17 test automation rules, each built to show one pattern that changes step cost (broad triggers, conditions placed last, branches over sub-tasks and search results, hourly schedules), a script that lists and reads every rule, and an interview guide for Jira admins.</p>
+      <p>Because the API returns secrets in full, the script strips URLs, headers and tokens before saving anything. I tested it offline on a sample rule with four planted secrets. All four were removed and the component counts were correct.</p>
+    </article>
+    <article class="entry">
+      <div class="date">8 Oct 2026 · Day 0</div>
+      <h3>From a broad goal to one problem</h3>
+      <p>Started with a broad goal: find a real problem on Atlassian's platform and build something useful for it.</p>
+      <p>Three early ideas were ruled out by research: two were already shipped and one had no data access. I then reviewed about 20 ideas against three checks, verified the shortlist's key facts against Atlassian's documentation, and chose automation step cost.</p>
+      <p>Two findings shape the design. The Rule Management API accepts API tokens but not Forge or OAuth apps, so the first version will be a web tool rather than a Marketplace app. And because the API returns rule configuration in full, secret handling is a core requirement.</p>
+    </article>
+  </div>
+</section>
+
+<section aria-labelledby="sources">
+  <h2 id="sources">Key sources</h2>
+  <ul class="sources">
+    <li><a href="https://support.atlassian.com/cloud-automation/docs/how-is-my-usage-calculated/">How is your automation usage calculated (Atlassian Support)</a></li>
+    <li><a href="https://www.atlassian.com/resources/usage">Usage visibility and controls (Atlassian)</a></li>
+    <li><a href="https://techrepublic.com/article/news-atlassian-rovo-automation-pricing">Atlassian Rovo and automation pricing (TechRepublic, Sep 2026)</a></li>
+    <li><a href="https://jira.atlassian.com/browse/AUTO-2207">AUTO-2207: Rule Management API returns sensitive values in clear text</a></li>
+    <li><a href="https://support.atlassian.com/rovo/docs/work-with-service-triage-agent/">Work with Service Triage agent (Atlassian Support)</a></li>
+    <li><a href="https://jira.atlassian.com/browse/ROVO-516">ROVO-516: Public APIs for Rovo agent management</a></li>
+    <li><a href="https://support.atlassian.com/jira-service-management-cloud/docs/manage-knowledge-bases-with-rovo/">Manage knowledge bases with Rovo (Atlassian Support)</a></li>
+    <li><a href="https://jira.atlassian.com/browse/JSDCLOUD-1743">JSDCLOUD-1743: Vote on an issue in the customer portal</a></li>
+  </ul>
+  <p class="note">Every product decision and its reasoning is in the <a href="decisions.html">decision log</a>.</p>
+</section>
+
+</div>

@@ -1,0 +1,109 @@
+<div class="wrap">
+<header>
+  <div class="eyebrow">{{NAME}} · Decision log · Vikash Kumar · Last updated 8 Oct 2026</div>
+  <h1>Decision log</h1>
+  <p>The main product decisions behind {{NAME}}, with the reasoning and the alternatives I considered. Newest at the bottom.</p>
+</header>
+
+<section aria-labelledby="ledger">
+  <h2 id="ledger">Decisions</h2>
+  <div class="ledger">
+
+    <article class="entry"><div class="id">01<span>8 Oct</span></div><div class="body">
+      <div class="meta"><span class="tag">Problem selection</span></div>
+      <h3>Choose the problem on usefulness and viability</h3>
+      <dl><dt>Criteria</dt><dd>How many teams have the problem. Whether an outside tool can reach the data it needs. Whether a first version can reach real users in about four weeks. Whether the value can be measured.</dd>
+      <dt>Not used</dt><dd>Fit with my own past experience. It can break a tie, nothing more.</dd></dl>
+    </div></article>
+
+    <article class="entry"><div class="id">02<span>8 Oct</span></div><div class="body">
+      <div class="meta"><span class="tag">Dropped</span><span class="tag">Jira Service Management</span></div>
+      <h3>Don't build an AI request triage agent</h3>
+      <dl><dt>Why</dt><dd>The Service Triage Rovo agent already suggests request type, urgency and priority, and flags requests that may need escalation.</dd></dl>
+    </div></article>
+
+    <article class="entry"><div class="id">03<span>8 Oct</span></div><div class="body">
+      <div class="meta"><span class="tag">Dropped</span><span class="tag">Rovo</span></div>
+      <h3>Don't build anything that needs Rovo agent data</h3>
+      <dl><dt>Why</dt><dd>Admins clearly want an organisation-wide view of agent evaluations and usage (ROVO-721, ROVO-154). But there is no public API to list agents or read their usage (ROVO-516), and Rovo can't be called from Forge backend code. An agent governance view or an agent scope tester can't be built properly from outside today.</dd></dl>
+    </div></article>
+
+    <article class="entry"><div class="id">04<span>8 Oct</span></div><div class="body">
+      <div class="meta"><span class="tag">Dropped</span><span class="tag">Jira Service Management</span></div>
+      <h3>Don't build a knowledge gap finder</h3>
+      <dl><dt>Why</dt><dd>Rovo's knowledge base skill, rolled out from April 2026, finds topics without documentation and drafts Confluence articles from resolved requests for review.</dd>
+      <dt>Change</dt><dd>I had shortlisted this before checking. From here on, checking Atlassian's documentation and release notes for the exact capability is the first step for every idea.</dd></dl>
+    </div></article>
+
+    <article class="entry"><div class="id">05<span>8 Oct</span></div><div class="body">
+      <div class="meta"><span class="tag">Method</span></div>
+      <h3>Scout widely, then apply three checks</h3>
+      <dl><dt>What</dt><dd>About 20 ideas across Jira and Product Discovery, Confluence and Loom, Jira Service Management, and Rovo with organisation admin.</dd>
+      <dt>Checks</dt><dd>Evidence of demand (votes, Community threads, paid apps). Not already shipped by Atlassian. Data reachable through a public API or Forge module.</dd>
+      <dt>Shortlist</dt><dd>Automation step cost. An "I'm affected too" option on the customer portal (JSDCLOUD-1743, 491 votes). Idea-to-delivery status sync for Product Discovery. A broken-link checker for Confluence (CONFCLOUD-65867, 108 votes).</dd>
+      <dt>Set aside</dt><dd>Expiring page verification, approval reminders and sprint carryover tracking, where several apps already compete. CSAT insights and long-range SLA history, which Atlassian has signalled it is working on.</dd></dl>
+    </div></article>
+
+    <article class="entry"><div class="id">06<span>8 Oct</span></div><div class="body">
+      <div class="meta"><span class="tag">Chosen</span></div>
+      <h3>Build a tool for automation step cost</h3>
+      <dl><dt>Why</dt><dd>Per-step billing starts on 3 December 2026 for every cloud organisation that uses automation, with extra usage on by default. Cost depends on how each rule is built, and from the public documentation I couldn't find a per-rule cost view. The value can be measured in money.</dd>
+      <dt>Constraints</dt><dd>The Rule Management API takes an admin's API token, not Forge or OAuth, so the first version is a web tool. There is no public API for how often each rule runs, so frequency has to be estimated.</dd>
+      <dt>Risks</dt><dd>Atlassian may add a per-rule view. Estimates may be too rough to trust. Admins may be wary of sharing an API token.</dd></dl>
+    </div></article>
+
+    <article class="entry"><div class="id">07<span>8 Oct</span></div><div class="body">
+      <div class="meta"><span class="tag">Validation</span></div>
+      <h3>Validate for three days before building</h3>
+      <dl><dt>Checks</dt><dd>The API returns each rule's structure, including nested branches and conditions. What the product already shows per rule. Whether Jira admins already know which of their rules are expensive.</dd>
+      <dt>Stop if</dt><dd>The API can't return rule structure, or most admins interviewed already know their expensive rules. The next shortlisted idea takes over.</dd></dl>
+    </div></article>
+
+    <article class="entry"><div class="id">08<span>8 Oct</span></div><div class="body">
+      <div class="meta"><span class="tag">Security</span></div>
+      <h3>Strip secrets before processing, keep no rule data</h3>
+      <dl><dt>Why</dt><dd>The API returns rule configuration in full, including values the UI masks, such as webhook URLs and authorisation headers (AUTO-2207).</dd>
+      <dt>How</dt><dd>Values under secret-looking fields and any URL or credential string are masked before anything is saved. Tested on a sample rule with four planted secrets: all four removed.</dd></dl>
+    </div></article>
+
+    <article class="entry"><div class="id">09<span>8 Oct</span></div><div class="body">
+      <div class="meta"><span class="tag">Process</span></div>
+      <h3>Build in public</h3>
+      <dl><dt>Why</dt><dd>A public repository shows how the work develops over time, not just the end result.</dd>
+      <dt>Guardrails</dt><dd>API tokens stay in a local file that is never committed. Rule data from any real site, even redacted, stays out of the repository.</dd></dl>
+    </div></article>
+
+    {{NAMING}}
+
+    <article class="entry"><div class="id">11<span>8 Oct</span></div><div class="body">
+      <div class="meta"><span class="tag">Phase 0 finding</span><span class="tag">Focus</span></div>
+      <h3>Focus on wasted steps and fixes, not on ranking flows</h3>
+      <dl><dt>Finding</dt><dd>Each space's Automation Usage tab already lists high-usage flows with runs and estimated steps. My earlier assumption, based on the public documentation, was wrong.</dd>
+      <dt>Gap</dt><dd>The Usage tab shows totals only. In the test site, one flow used 7 steps over 3 runs, and 4 of those steps went to two runs that stopped at a condition and did nothing. Nothing on the tab shows that, or what to change.</dd>
+      <dt>New focus</dt><dd>For each flow, show how much of its cost goes to runs that do nothing, explain which part of the flow causes it, and suggest a rewrite with the expected saving before anything is changed.</dd>
+      <dt>Evidence</dt><dd>My step model matched Atlassian's count exactly: 11 of 11 steps across 5 runs on 3 flows.</dd></dl>
+    </div></article>
+
+  </div>
+</section>
+
+<section aria-labelledby="sources">
+  <h2 id="sources">Sources</h2>
+  <ul class="sources">
+    <li><a href="https://support.atlassian.com/cloud-automation/docs/how-is-my-usage-calculated/">How is your automation usage calculated (Atlassian Support)</a></li>
+    <li><a href="https://www.atlassian.com/resources/usage">Usage visibility and controls (Atlassian)</a></li>
+    <li><a href="https://techrepublic.com/article/news-atlassian-rovo-automation-pricing">Atlassian Rovo and automation pricing (TechRepublic, Sep 2026)</a></li>
+    <li><a href="https://jira.atlassian.com/browse/AUTO-2207">AUTO-2207: Rule Management API returns sensitive values in clear text</a></li>
+    <li><a href="https://community.developer.atlassian.com/t/using-automation-rest-api-with-oauth-token/90125">Using the Automation REST API with an OAuth token (Developer Community)</a></li>
+    <li><a href="https://support.atlassian.com/rovo/docs/work-with-service-triage-agent/">Work with Service Triage agent (Atlassian Support)</a></li>
+    <li><a href="https://jira.atlassian.com/browse/ROVO-516">ROVO-516: Public APIs for Rovo agent management</a></li>
+    <li><a href="https://jira.atlassian.com/browse/ROVO-721">ROVO-721: Compliance dashboard for Rovo agents</a></li>
+    <li><a href="https://jira.atlassian.com/browse/ROVO-154">ROVO-154: Improve audit log data for Rovo</a></li>
+    <li><a href="https://community.developer.atlassian.com/t/calling-rovo-from-a-forge-app/99784">Calling Rovo from a Forge app (Developer Community)</a></li>
+    <li><a href="https://support.atlassian.com/jira-service-management-cloud/docs/manage-knowledge-bases-with-rovo/">Manage knowledge bases with Rovo (Atlassian Support)</a></li>
+    <li><a href="https://jira.atlassian.com/browse/JSDCLOUD-1743">JSDCLOUD-1743: Vote on an issue in the customer portal</a></li>
+    <li><a href="https://jira.atlassian.com/browse/CONFCLOUD-65867">CONFCLOUD-65867: Link report and validator</a></li>
+    <li><a href="https://developer.atlassian.com/platform/marketplace/atlassian-brand-guidelines-for-marketplace-vendors/">Atlassian brand guidelines for Marketplace vendors</a></li>
+  </ul>
+</section>
+</div>
