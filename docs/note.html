@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wasted Steps in Short</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a short single column. Headline, three numbers, what was built, questions. */
+:root{
+  --bg:#f4f5f2; --surface:#ffffff; --fg:#1d2320; --muted:#5d6862; --line:#d9ded9;
+  --accent:#2e5c8a; --accent-soft:#e3ecf5; --waste:#a8462f; --waste-soft:#f7e5e0; --ok:#2c6b3f; --ok-soft:#e3f1e6; --mock:#fbfbfa;
+  --display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#131614; --surface:#1b201d; --fg:#e5e9e6; --muted:#9ca8a1; --line:#2d3530;
+  --accent:#8db8e3; --accent-soft:#1b2a3a; --waste:#ef9a85; --waste-soft:#36201b; --ok:#7fc994; --ok-soft:#18291d; --mock:#161a18; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15.5px;line-height:1.6}
+nav{max-width:780px;margin:0 auto;padding:16px 16px 0;font-family:var(--mono);font-size:.8rem}
+a{color:var(--accent);text-underline-offset:2px}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:780px;margin:0 auto;padding-inline:16px;padding-block:28px 72px;display:flex;flex-direction:column;gap:30px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.2;text-wrap:balance}
+h1{font-size:2.2rem;font-weight:600}
+h2{font-size:1.3rem;font-weight:600}
+p{margin:0;max-width:68ch}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+header,section{display:flex;flex-direction:column;gap:12px}
+.lede{font-size:1.06rem}
+ol,ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+li{max-width:68ch}
+.stat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:600px){.stat{grid-template-columns:1fr}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;min-width:0}
+.tile .n{font-family:var(--display);font-size:1.7rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.tile .l{font-size:.84rem;color:var(--muted)}
+.tile.w .n{color:var(--waste)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+th{font-family:var(--mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.yes{color:var(--ok);font-weight:500}
+.no{color:var(--waste);font-weight:500}
+.mock{border:1px dashed var(--muted);border-radius:8px;padding:14px;background:var(--mock);display:flex;flex-direction:column;gap:10px}
+.mock .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.mock table{background:var(--surface)}
+.new{background:var(--accent-soft)}
+.flag{display:inline-block;font-family:var(--mono);font-size:.72rem;padding:1px 7px;border-radius:99px;background:var(--waste-soft);color:var(--waste);margin:2px 4px 2px 0;white-space:nowrap}
+.note{font-size:.86rem;color:var(--muted)}
+.cta{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:4px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Stepmeter for Jira · Vikash Kumar · October 2026</div>
+  <h1>On 3 December, admins will see what their automation costs. They won't see what it wasted.</h1>
+  <p class="lede">Per-step billing starts on 3 December, with overage on by default. The Usage tab tells an admin which flows use the most steps. It doesn't tell them how many of those steps did nothing, or why. I think that gap will show up as confused admins and surprise bills, so I tested it.</p>
+</header>
+
+<section>
+  <h2>What I found on a test site</h2>
+  <div class="stat">
+    <div class="tile w"><div class="n">21%</div><div class="l">of all steps went to runs that did nothing or failed</div></div>
+    <div class="tile w"><div class="n">40%</div><div class="l">of one common flow's steps did nothing</div></div>
+    <div class="tile"><div class="n">56 / 57</div><div class="l">steps I predicted before the Usage tab reported them</div></div>
+  </div>
+  <ul>
+    <li><strong>A wasteful flow can look healthy.</strong> One flow changed a work item, then stopped at its check. The audit log marked the run Success. Nothing tells the admin the flow is built in a costly way.</li>
+    <li><strong>The biggest costs are the hardest to trace.</strong> Branches and scheduled searches cost a step per work item, but the audit log shows them as one line each.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>What I built</h2>
+  <p>A small open-source tool that reads a site's flows and its work item history, then shows for each flow how many steps were wasted, why, and what to change. On my test site, it matched the Usage tab's run count for every event-driven flow, and 89 of 97 steps. The gap was one manual run, which history can't see.</p>
+  <p>I also have a sketch of how this could fit into the Usage tab itself, using data Atlassian already has. I'd rather walk through that on the call.</p>
+</section>
+
+<section class="cta">
+  <h2>What I'd value your view on</h2>
+  <ol>
+    <li>Is this a question customers are already asking, or will they only start asking after 3 December?</li>
+    <li>Is "wasted steps" the right way to frame it?</li>
+    <li>What am I missing about how large customers build flows?</li>
+  </ol>
+  <p class="note">This is a personal project, not affiliated with Atlassian. Everything above comes from one test site, so treat the numbers as signals, not benchmarks. More detail if useful: <a href="brief.html">full brief</a> · <a href="demo.html">demo report</a> · <a href="https://github.com/pvikash789-rgb/Stepmeter-for-Jira">code</a>.</p>
+</section>
+
+</div>
+</body>
+</html>
