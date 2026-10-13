@@ -29,7 +29,7 @@ import json
 import re
 import sys
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -38,6 +38,7 @@ from fetch_rules import load_env, make_request  # noqa: E402
 
 OUT = Path(__file__).resolve().parent / "output"
 DAYS = 30
+MAX_ITEMS = 1000  # work items read for history on large sites
 
 
 # ---------------------------------------------------------------- helpers
@@ -119,9 +120,22 @@ def label_for(comp):
 # ------------------------------------------------------------ Jira access
 
 class Jira:
-    def __init__(self, site, auth):
+    def __init__(self, site, auth, tz_name=None):
         self.site, self.auth = site, auth
         self._projects = {}
+        self._issues = {}
+        self.tz = timezone.utc
+        if tz_name:
+            try:
+                from zoneinfo import ZoneInfo
+                self.tz = ZoneInfo(tz_name)
+            except Exception:
+                pass
+
+    def when(self, dt):
+        """Format a time for JQL, in the user's own time zone (how Jira reads JQL dates).
+        One minute earlier, to be safe; exact filtering happens afterwards."""
+        return (dt - timedelta(minutes=1)).astimezone(self.tz).strftime("%Y-%m-%d %H:%M")
 
     def count(self, jql):
         """Number of work items matching jql, or None if it can't be counted."""
@@ -129,21 +143,37 @@ class Jira:
                                     self.auth, "POST", {"jql": jql})
         if status == 200 and isinstance(data.get("count"), int):
             return data["count"]
-        # Fallback: page through ids (fine for small sites).
-        total, token = 0, None
-        for _ in range(50):
-            q = {"jql": jql, "maxResults": "100", "fields": "id"}
+        issues = self.search(jql, fields="id", expand=None, limit=5000)
+        return None if issues is None else len(issues)
+
+    def search(self, jql, fields="labels,subtasks,created,status", expand="changelog", limit=MAX_ITEMS):
+        out, token = [], None
+        while len(out) < limit:
+            q = {"jql": jql, "maxResults": "100", "fields": fields}
+            if expand:
+                q["expand"] = expand
             if token:
                 q["nextPageToken"] = token
             status, data = make_request(
                 f"https://{self.site}/rest/api/3/search/jql?{urllib.parse.urlencode(q)}", self.auth)
             if status != 200:
-                return None
-            total += len(data.get("issues", []))
+                return None if not out else out
+            out.extend(data.get("issues", []))
             token = data.get("nextPageToken")
             if not token:
-                return total
-        return total
+                break
+        return out
+
+    def issues_with_history(self, scope, since):
+        """Work items updated since `since`, with their change history. Cached per scope."""
+        key = scope
+        cached = self._issues.get(key)
+        if cached and cached[0] <= since:
+            return cached[1]
+        jql = jql_and(scope, f'updated >= "{self.when(since)}"') + " ORDER BY updated DESC"
+        issues = self.search(jql)
+        self._issues[key] = (since, issues or [])
+        return issues or []
 
     def project_key(self, pid):
         if pid not in self._projects:
@@ -167,6 +197,89 @@ def jql_and(*parts):
     return " AND ".join(p for p in parts if p)
 
 
+def parse_time(s):
+    """Jira timestamps look like 2026-10-08T21:28:18.123+0530."""
+    if not s:
+        return None
+    if isinstance(s, (int, float)) or re.fullmatch(r"\d{10,13}", str(s)):
+        v = float(s)
+        return datetime.fromtimestamp(v / 1000 if v > 1e11 else v, tz=timezone.utc)
+    s = re.sub(r"\.\d+", "", str(s))
+    s = re.sub(r"([+-]\d\d):?(\d\d)$", r"\1\2", s).replace("Z", "+0000")
+    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M%z"):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            pass
+    return None
+
+
+# ------------------------------------------------------------ events
+
+NOT_UPDATE_FIELDS = {"status", "resolution", "workflow", "resolutiondate"}
+
+
+def events_for(issue):
+    """Human change events on one work item, newest first, each with the labels it had right after."""
+    labels_now = set((issue.get("fields") or {}).get("labels") or [])
+    histories = ((issue.get("changelog") or {}).get("histories")) or []
+    histories = sorted(histories, key=lambda h: h.get("created", ""), reverse=True)
+    events, labels = [], set(labels_now)
+    for h in histories:
+        items = h.get("items") or []
+        author = h.get("author") or {}
+        by_app = author.get("accountType") == "app"
+        events.append({
+            "key": issue.get("key"),
+            "when": parse_time(h.get("created")),
+            "by_app": by_app,
+            "fields": {str(i.get("fieldId") or i.get("field") or "").lower() for i in items},
+            "status_to": [str(i.get("toString") or "") for i in items if str(i.get("field", "")).lower() == "status"]
+                         + [str(i.get("to") or "") for i in items if str(i.get("field", "")).lower() == "status"],
+            "labels_after": set(labels),
+        })
+        for i in items:
+            if str(i.get("field", "")).lower() == "labels":
+                labels = set(str(i.get("fromString") or "").split())
+    return events
+
+
+def condition_test(comp):
+    """Return (test(labels)->bool, description) for a simple labels condition, else (None, reason)."""
+    val = comp.get("value") or {}
+    field = str(((val.get("selectedField") or {}).get("value")) or val.get("selectedFieldType") or "").lower()
+    comparison = str(val.get("comparison") or "").upper()
+    cv = (val.get("compareValue") or {}).get("value")
+    if field != "labels":
+        return None, f"condition on '{field or 'unknown field'}' ({comparison or 'unknown comparison'})"
+    wanted = []
+    if isinstance(cv, list):
+        wanted = [str(x) for x in cv]
+    elif isinstance(cv, str):
+        s = cv.strip()
+        if s.startswith("["):
+            try:
+                wanted = [str(x) for x in json.loads(s)]
+            except ValueError:
+                wanted = re.findall(r"[\w.\-]+", s)
+        else:
+            wanted = [p.strip() for p in re.split(r"[,\s]+", s) if p.strip()]
+    wanted = set(wanted)
+    if not wanted:
+        return None, "labels condition with no readable values"
+    negate = "NOT" in comparison or "NONE" in comparison
+    if "ALL" in comparison and not negate:
+        test = lambda labels: wanted <= labels
+    elif comparison in ("IS_EMPTY", "EMPTY"):
+        test = lambda labels: not labels
+    else:
+        test = lambda labels: bool(wanted & labels)
+    if negate:
+        base = test
+        test = lambda labels: not base(labels)
+    return test, None
+
+
 # ---------------------------------------------------------------- analysis
 
 def classify_trigger(trigger):
@@ -188,51 +301,31 @@ def classify_trigger(trigger):
     return "other"
 
 
-def condition_jql(comp):
-    """Turn a simple condition into JQL, or return None if we can't."""
-    t = str(comp.get("type", "")).lower()
-    val = comp.get("value") or {}
-    if "jql" in t:
-        q = find_first(val, r"jql|query")
-        return q
-    pairs = list(walk_strings(val))
-    if any(v.lower() == "labels" for _, v in pairs):
-        skip_keys = re.compile(r"type|comparison|operator|compare$|field|kind|mode", re.I)
-        negate = any(re.search(r"not|none", v, re.I) for k, v in pairs if re.search(r"comparison|operator", k, re.I))
-        labels = []
-        for k, v in pairs:
-            if skip_keys.search(k) or v.lower() == "labels" or v.startswith(("{", "$")):
-                continue
-            for part in v.split(","):
-                part = part.strip()
-                if re.fullmatch(r"[\w.\-]+", part) and not re.fullmatch(r"[A-Z_]+|\d+|customfield_\d+", part):
-                    labels.append(part)
-        if labels:
-            clause = f"labels in ({', '.join(json.dumps(l) for l in dict.fromkeys(labels))})"
-            return f"NOT ({clause})" if negate else clause
-    return None
-
-
-def analyse(rule, summary, jira):
+def analyse(rule, summary, jira, now):
     body = rule.get("rule", rule)
     name = body.get("name") or summary.get("name", "?")
     state = str(body.get("state") or summary.get("state", "")).upper()
     trigger = body.get("trigger") or {}
+    tval = trigger.get("value") or {}
     comps = body.get("components") or []
     tkind = classify_trigger(trigger)
     scope, keys = scope_clause(jira, summary)
 
-    chain = [{"kind": "trigger", "label": label_for(trigger) if trigger.get("type") else "Trigger",
-              "type": trigger.get("type", "")}]
+    created = parse_time(summary.get("created") or body.get("created"))
+    window_start = now - timedelta(days=DAYS)
+    since = max(created, window_start) if created else window_start
+    days = max(1, round((now - since).total_seconds() / 86400, 1))
+
+    chain = [{"kind": "trigger", "label": label_for(trigger) if trigger.get("type") else "Trigger"}]
     for c in comps:
-        item = {"kind": kind_of(c), "label": label_for(c), "type": c.get("type", "")}
+        item = {"kind": kind_of(c), "label": label_for(c)}
         if item["kind"] == "branch":
             item["children"] = [{"kind": kind_of(ch), "label": label_for(ch)} for ch in children_of(c)]
         chain.append(item)
 
     res = {"name": name, "enabled": state != "DISABLED", "trigger_kind": tkind, "chain": chain,
-           "scope": keys, "findings": [], "notes": [], "runs": None, "steps_per_full_run": None,
-           "steps_per_stopped_run": None, "est_steps": None, "est_wasted": None, "fix": None}
+           "scope": keys, "since": f"{since:%d %b %Y}", "days": days, "findings": [], "notes": [],
+           "runs": None, "runs_stopped": None, "est_steps": None, "est_wasted": None, "fix": None}
     if not res["enabled"]:
         res["findings"].append("Turned off, so it uses no steps.")
         res["est_steps"] = res["est_wasted"] = 0
@@ -241,101 +334,114 @@ def analyse(rule, summary, jira):
     first_cond = next((i for i, c in enumerate(comps) if kind_of(c) == "condition"), None)
     actions_before = first_cond is not None and any(kind_of(c) != "condition" for c in comps[:first_cond])
     branch_comps = [c for c in comps if kind_of(c) == "branch"]
+    test, why_not = (condition_test(comps[first_cond]) if first_cond is not None else (None, None))
 
-    # Steps for one full run (branches counted with one item each; adjusted below).
-    def full_steps(per_item=1):
+    def full_steps(n_related=1):
         s = 1
         for c in comps:
             if kind_of(c) == "branch":
-                s += 1 + per_item * max(1, len(children_of(c)))
+                s += 1 + n_related * max(1, len(children_of(c)))
             else:
                 s += 1
         return s
 
-    res["steps_per_full_run"] = full_steps()
-    if first_cond is not None:
-        res["steps_per_stopped_run"] = 1 + first_cond + 1
+    stopped_steps = (1 + first_cond + 1) if first_cond is not None else None
 
-    # Runs in the last 30 days, estimated from Jira activity.
-    period = f"-{DAYS}d"
-    runs = None
-    if tkind == "created":
-        runs = jira.count(jql_and(scope, f"created >= {period}"))
-        res["notes"].append(f"Runs estimated as work items created in the last {DAYS} days.")
-    elif tkind == "updated":
-        runs = jira.count(jql_and(scope, f"updated >= {period}"))
-        res["notes"].append(f"Runs estimated as work items updated in the last {DAYS} days. "
-                            "Each item can be updated many times, so this is a lower bound.")
-    elif tkind == "transitioned":
-        to_status = find_first(trigger.get("value") or {}, r"^(to|toStatus|name|value)$")
-        clause = f'status CHANGED TO "{to_status}" AFTER {period}' if to_status and len(to_status) < 40 else f"status CHANGED AFTER {period}"
-        runs = jira.count(jql_and(scope, clause))
-        res["notes"].append(f"Runs estimated as work items whose status changed in the last {DAYS} days.")
-    elif tkind == "scheduled":
-        runs = DAYS
-        res["notes"].append("Assumed to run once a day.")
-    else:
-        res["notes"].append("Run frequency can't be estimated from Jira activity for this trigger type.")
-    res["runs"] = runs
-
-    # Scheduled search: one step per matching work item per run.
+    # ---- scheduled search
     if tkind == "scheduled":
-        q = find_first(trigger.get("value") or {}, r"jql")
+        q = tval.get("jql") or find_first(tval, r"jql")
+        only_changed = bool(tval.get("onlyUpdatedIssues"))
         matches = jira.count(q) if q else None
+        runs = max(1, round(days))
+        res["runs"] = runs
         if matches is not None:
             per_run = 1 + matches * max(1, len(comps))
-            res["steps_per_full_run"] = per_run
-            res["est_steps"] = per_run * DAYS
-            res["findings"].append(f"Costs one step for the search plus {max(1, len(comps))} per matching work item, every run. "
-                                   f"It matches {matches} items today, so about {per_run} steps a run and {per_run * DAYS:,} a month.")
-            res["fix"] = ("Only act on items that changed since the last run (an option on the scheduled trigger), "
-                          "or narrow the search. Steps grow with every item the search matches.")
-        else:
-            res["findings"].append("A scheduled search that pays a step per matching work item, but its search couldn't be read.")
-        res["est_wasted"] = None
+            res["est_steps"] = per_run * runs
+            res["findings"].append(
+                f"Costs one step for the search plus {max(1, len(comps))} per matching work item, every run. "
+                f"It matches {matches} items today: about {per_run} steps a run, {per_run * 30:,} a month if it runs daily.")
+            if not only_changed:
+                res["fix"] = ("Turn on 'only include work items changed since the last run' on the scheduled trigger, "
+                              "or narrow the search. Today it acts on every match, every run.")
+        res["notes"].append(f"Assumed to run once a day since {res['since']}.")
         return res
 
-    # Branches: cost per related item.
-    if branch_comps:
-        res["findings"].append("Contains a branch. Every related work item the branch touches costs its own steps, "
-                               "so the flow gets more expensive as items have more children or links.")
-
-    # Broad trigger followed by a filter, or work before the check.
-    pass_runs = None
-    if first_cond is not None and runs:
-        cq = condition_jql(comps[first_cond])
-        if cq and tkind in ("updated", "created"):
-            window = "updated" if tkind == "updated" else "created"
-            pass_runs = jira.count(jql_and(scope, f"{window} >= {period}", cq))
-        if cq is None:
-            res["notes"].append("The first condition is too complex to turn into a search, so the pass rate isn't estimated.")
-
-    if runs is not None and res["est_steps"] is None:
-        full, stopped = res["steps_per_full_run"], res["steps_per_stopped_run"]
-        if pass_runs is not None:
-            stop_runs = max(0, runs - pass_runs)
-            res["est_steps"] = pass_runs * full + stop_runs * stopped
-            res["est_wasted"] = stop_runs * stopped
+    # ---- event triggers: count real events from work item history
+    if tkind in ("updated", "field_changed", "transitioned", "created"):
+        issues = jira.issues_with_history(scope, since) if tkind != "created" else None
+        runs_list = []  # each: (labels_after, issue)
+        if tkind == "created":
+            created_issues = jira.search(jql_and(scope, f'created >= "{jira.when(since)}"'),
+                                         fields="labels,subtasks,created", expand=None) or []
+            created_issues = [i for i in created_issues
+                              if (parse_time((i.get("fields") or {}).get("created")) or since) >= since]
+            runs_list = [(set((i.get("fields") or {}).get("labels") or []), i) for i in created_issues]
+            res["notes"].append(f"Runs counted as work items created since {res['since']}.")
         else:
-            res["est_steps"] = runs * full
+            wanted_fields = {str(f.get("value", "")).lower() for f in (tval.get("fields") or []) if isinstance(f, dict)}
+            to_status = {str(s.get("value", "")).lower() for s in (tval.get("toStatus") or []) if isinstance(s, dict)}
+            for issue in issues:
+                for ev in events_for(issue):
+                    if not ev["when"] or ev["when"] < since or ev["by_app"]:
+                        continue
+                    if tkind == "updated" and not (ev["fields"] - NOT_UPDATE_FIELDS):
+                        continue
+                    if tkind == "field_changed" and not (ev["fields"] & wanted_fields):
+                        continue
+                    if tkind == "transitioned":
+                        if "status" not in ev["fields"]:
+                            continue
+                        if to_status and not ({s.lower() for s in ev["status_to"]} & to_status):
+                            continue
+                    runs_list.append((ev["labels_after"], issue))
+            what = {"updated": "edits to work items (not status changes or comments)",
+                    "field_changed": f"changes to {', '.join(sorted(wanted_fields)) or 'the chosen fields'}",
+                    "transitioned": "status changes" + (f" to {', '.join(sorted(to_status))}" if to_status else "")}[tkind]
+            res["notes"].append(f"Runs counted from work item history: {what} made by people since {res['since']}. "
+                                "Changes made by automation are skipped, since they don't start other flows by default.")
+        runs = len(runs_list)
+        res["runs"] = runs
 
+        total = wasted = stopped = 0
+        for labels_after, issue in runs_list:
+            n_rel = 1
+            if branch_comps:
+                n_rel = len(((issue.get("fields") or {}).get("subtasks")) or []) or 0
+            if test is not None and not test(labels_after):
+                total += stopped_steps
+                wasted += stopped_steps
+                stopped += 1
+            else:
+                total += full_steps(n_rel) if branch_comps else full_steps()
+        res["est_steps"] = total
+        if test is not None:
+            res["est_wasted"] = wasted
+            res["runs_stopped"] = stopped
+        elif first_cond is not None:
+            res["notes"].append(f"Couldn't evaluate the first check ({why_not}), so every run is counted as a full run.")
+        if branch_comps:
+            res["notes"].append("Branch cost uses each work item's current number of sub-tasks.")
+    else:
+        res["notes"].append("Runs can't be counted from work item history for this trigger type.")
+
+    # ---- design findings
     if actions_before:
-        res["findings"].append("Does work before checking whether it should. Runs that stop at the check still pay for "
-                               "the earlier steps and still change the work item, and the audit log marks them as successful.")
+        msg = "Does work before checking whether it should. Runs that stop at the check still pay for the earlier steps and still change the work item, and the audit log marks them as successful."
+        if res["runs_stopped"]:
+            msg += f" {res['runs_stopped']} of {res['runs']} runs stopped at the check."
+        res["findings"].append(msg)
         res["fix"] = "Move the check above the actions. Runs that stop would cost less and wouldn't change anything."
     elif tkind == "updated" and first_cond == 0:
-        msg = "Starts on every update to any work item, then filters with a check."
-        if pass_runs is not None and runs:
-            msg += f" About {runs - pass_runs} of {runs} estimated runs would stop at the check and do nothing."
+        msg = "Starts on every edit to any work item, then filters with a check."
+        if res["runs_stopped"] is not None:
+            msg += f" {res['runs_stopped']} of {res['runs']} runs stopped at the check and did nothing."
         res["findings"].append(msg)
         res["fix"] = ("If the flow only needs to react to one field, trigger on that field changing instead. "
                       "Runs that would stop at the check then never start.")
-    if tkind == "updated" and first_cond is None and not comps:
-        res["findings"].append("Starts on every update but does nothing.")
-
+    if branch_comps:
+        res["findings"].append("Contains a branch. Each related work item costs its own steps, so cost grows with the number of sub-tasks or links.")
     if any("webhook" in str(c.get("type", "")).lower() for c in comps):
-        res["notes"].append("Sends a web request. Failed requests still use steps; check the audit log for errors.")
-
+        res["notes"].append("Sends a web request. Failed requests still use steps, and failures aren't visible from history; check the audit log.")
     if not res["findings"]:
         res["findings"].append("No costly pattern found in how this flow is built.")
     return res
@@ -371,8 +477,8 @@ def render(site, results):
     order = sorted(results, key=lambda r: (-(r["est_wasted"] or 0), -(r["est_steps"] or 0), not r["enabled"]))
     tiles = [
         (f"{len(results)}", "flows read"),
-        (f"{total:,}", f"estimated steps, last {DAYS} days"),
-        (f"{wasted:,}", "estimated steps on runs that stop at a check", True),
+        (f"{total:,}", f"steps, since each flow was created (up to {DAYS} days)"),
+        (f"{wasted:,}", "steps on runs that stopped at a check", True),
         (f"{len(flagged)}", "flows with a suggested fix"),
     ]
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
@@ -381,7 +487,7 @@ def render(site, results):
            "<h1>Automation waste report</h1>",
            "<p>Generated automatically from this site's flows and recent Jira activity. Step counts follow Atlassian's rules: "
            "one step for each trigger, condition, action and branch that runs, and per work item inside branches and scheduled searches. "
-           "Run counts are estimates from the last 30 days of activity, not from the automation audit log.</p>",
+           "Runs are counted from each work item's change history since the flow was created (up to 30 days), skipping changes made by automation. They are estimates, not the automation audit log, which has no public API.</p>",
            "<div class='tiles'>" + "".join(f"<div class='tile{' w' if len(t) > 2 else ''}'><div class='n'>{esc(t[0])}</div><div class='muted'>{esc(t[1])}</div></div>" for t in tiles) + "</div>",
            "<h2>Flows</h2>"]
     for r in order:
@@ -392,11 +498,11 @@ def render(site, results):
                 chips.append(f"<span class='chip'>{esc(ch['label'])}</span>")
         nums = []
         if r["runs"] is not None:
-            nums.append(f"~{r['runs']:,} runs")
+            nums.append(f"{r['runs']:,} runs since {r['since']}")
         if r["est_steps"] is not None:
-            nums.append(f"~{r['est_steps']:,} steps")
+            nums.append(f"{r['est_steps']:,} steps")
         if r["est_wasted"]:
-            nums.append(f"~{r['est_wasted']:,} wasted")
+            nums.append(f"{r['est_wasted']:,} wasted")
         pill = ""
         if r["est_wasted"] and r["est_steps"]:
             pill = f"<span class='pill'>{round(r['est_wasted'] / r['est_steps'] * 100)}% wasted</span>"
@@ -453,15 +559,28 @@ def main():
     print(f"Logged in as {me.get('displayName')}. Reading flows from {site} ...")
     rules = fetch_rules(site, auth)
     print(f"Read {len(rules)} flows. Estimating activity for the last {DAYS} days ...")
-    jira = Jira(site, auth)
+    jira = Jira(site, auth, me.get("timeZone"))
+    now = datetime.now(timezone.utc)
     results, shapes = [], []
     for summary, full in rules:
-        r = analyse(full, summary, jira)
+        r = analyse(full, summary, jira, now)
         results.append(r)
         body = full.get("rule", full)
-        shapes.append({"name": r["name"], "trigger": shape(body.get("trigger")), "components": shape(body.get("components"))})
-        est = f"~{r['est_steps']} steps" if r["est_steps"] is not None else "steps unknown"
-        print(f"  {r['name'][:34]:34} {est:>16}  {'FIX' if r['fix'] else ''}")
+        checks = []
+        for c in body.get("components") or []:
+            if kind_of(c) == "condition":
+                v = c.get("value") or {}
+                cv = (v.get("compareValue") or {}).get("value")
+                checks.append({"type": c.get("type"), "field": (v.get("selectedField") or {}).get("value"),
+                               "comparison": v.get("comparison"), "value_kind": type(cv).__name__,
+                               "value_is_json_list": isinstance(cv, str) and cv.strip().startswith("["),
+                               "readable": condition_test(c)[0] is not None})
+        shapes.append({"name": r["name"], "trigger_type": body.get("trigger", {}).get("type"), "checks": checks,
+                       "trigger": shape(body.get("trigger")), "components": [shape(c) for c in body.get("components") or []]})
+        est = f"{r['est_steps']} steps" if r["est_steps"] is not None else "steps unknown"
+        runs = f"{r['runs']} runs" if r["runs"] is not None else ""
+        wasted = f"{r['est_wasted']} wasted" if r["est_wasted"] else ""
+        print(f"  {r['name'][:30]:30} {runs:>9} {est:>13} {wasted:>11}  {'FIX' if r['fix'] else ''}")
 
     OUT.mkdir(exist_ok=True)
     (OUT / "report.html").write_text(render(site, results))
