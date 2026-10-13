@@ -77,7 +77,7 @@ ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
 <header>
   <div class="eyebrow">Stepmeter for Jira · Demo report · Test site</div>
   <h1>Where this site's automation steps go</h1>
-  <p>A first version of the report Stepmeter will give admins. It reads each flow's structure and its run results, then shows how many steps did useful work, how many went to runs that did nothing or failed, what caused it, and what to change.</p>
+  <p>The report Stepmeter gives admins. A working prototype now builds it automatically from a live site. It reads each flow's structure and its run results, then shows how many steps did useful work, how many went to runs that did nothing or failed, what caused it, and what to change.</p>
   <p class="note">Data: the Stepmeter test site, 8 flows (a ninth, added after this snapshot, is left out). Step totals from the Automation Usage tab on 9 Oct 2026, 9:37 AM. Run outcomes from the audit log. Flow structure read through the Automation Rule Management API.</p>
 </header>
 
@@ -96,7 +96,7 @@ ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
     <li>A run counts as wasted when it stopped at a condition before doing the flow's job, or when its main action failed.</li>
     <li>Fixes are found from the flow's structure: a broad trigger followed by a filter, work done before a check, a search that touches every match every day, a flow that fails every time.</li>
     <li>Savings are what the same runs would have cost after the fix. Event-driven flows aren't projected to a month, because that depends on how often a site's work items change.</li>
-    <li>Flow 11 counted 3 steps for a run where the model expects 2. This is still being investigated.</li>
+    <li>A web request counts as 2 steps, whether it succeeds or fails. This was found by comparing a failing and a succeeding request flow on the test site.</li>
   </ul>
 </section>
 

@@ -39,6 +39,9 @@ from fetch_rules import load_env, make_request  # noqa: E402
 OUT = Path(__file__).resolve().parent / "output"
 DAYS = 30
 MAX_ITEMS = 1000  # work items read for history on large sites
+# Observed on the test site: a flow with a trigger and one web request used 3 steps per run,
+# whether the request succeeded or failed. So a web request counts as 2 steps.
+STEP_COST = {"jira.issue.outgoing.webhook": 2}
 
 
 # ---------------------------------------------------------------- helpers
@@ -336,16 +339,19 @@ def analyse(rule, summary, jira, now):
     branch_comps = [c for c in comps if kind_of(c) == "branch"]
     test, why_not = (condition_test(comps[first_cond]) if first_cond is not None else (None, None))
 
+    def cost(c):
+        return STEP_COST.get(str(c.get("type", "")), 1)
+
     def full_steps(n_related=1):
         s = 1
         for c in comps:
             if kind_of(c) == "branch":
-                s += 1 + n_related * max(1, len(children_of(c)))
+                s += 1 + n_related * max(1, sum(cost(ch) for ch in children_of(c)))
             else:
-                s += 1
+                s += cost(c)
         return s
 
-    stopped_steps = (1 + first_cond + 1) if first_cond is not None else None
+    stopped_steps = (1 + sum(cost(c) for c in comps[:first_cond]) + 1) if first_cond is not None else None
 
     # ---- scheduled search
     if tkind == "scheduled":
@@ -355,7 +361,7 @@ def analyse(rule, summary, jira, now):
         runs = max(1, round(days))
         res["runs"] = runs
         if matches is not None:
-            per_run = 1 + matches * max(1, len(comps))
+            per_run = 1 + matches * max(1, sum(cost(c) for c in comps))
             res["est_steps"] = per_run * runs
             res["findings"].append(
                 f"Costs one step for the search plus {max(1, len(comps))} per matching work item, every run. "
@@ -441,7 +447,7 @@ def analyse(rule, summary, jira, now):
     if branch_comps:
         res["findings"].append("Contains a branch. Each related work item costs its own steps, so cost grows with the number of sub-tasks or links.")
     if any("webhook" in str(c.get("type", "")).lower() for c in comps):
-        res["notes"].append("Sends a web request. Failed requests still use steps, and failures aren't visible from history; check the audit log.")
+        res["notes"].append("Sends a web request, which counts as 2 steps per run whether it succeeds or fails. Failures aren't visible from history; check the audit log.")
     if not res["findings"]:
         res["findings"].append("No costly pattern found in how this flow is built.")
     return res

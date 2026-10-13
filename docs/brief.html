@@ -85,7 +85,7 @@ td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
     <li><strong>A badly ordered flow looks healthy.</strong> A flow that edits a work item before checking whether it should stopped at the check, used 3 steps, changed the item anyway, and its run was marked Success. Nothing tells the admin the flow is built in a costly way.</li>
     <li><strong>Per-item cost is hard to trace.</strong> Branches and scheduled searches cost one step per work item. The audit log shows each action as one line, so an admin can't see where a flow's cost comes from. A daily search over 500 work items would use about 15,000 steps a month on its own.</li>
   </ol>
-  <p class="note">Also seen: the Usage tab took about two hours to reflect new runs, and one failing web request counted 3 steps where 2 were expected (still investigating).</p>
+  <p class="note">Also seen: the Usage tab took about two hours to reflect new runs, and a web request counts as 2 steps, whether it succeeds or fails.</p>
 </section>
 
 <section aria-labelledby="gap">
@@ -124,7 +124,8 @@ td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
 
 <section aria-labelledby="build">
   <h2 id="build">What I'm building</h2>
-  <p><strong>Stepmeter</strong> is a small open-source tool that does this outside the product today: it reads each flow's structure and run results, shows the wasted steps per flow, explains the cause, and suggests a fix with its saving. The first version works on the test site: <a href="demo.html">see the demo report</a>.</p>
+  <p><strong>Stepmeter</strong> is a small open-source tool that does this outside the product today: it reads each flow's structure and run results, shows the wasted steps per flow, explains the cause, and suggests a fix with its saving. See the <a href="demo.html">demo report</a> for what it shows.</p>
+  <p>A working prototype now builds this report automatically from a live site: it reads every flow through the API and counts runs from each work item's change history. On the test site it matched the Usage tab's run count for all 7 flows that react to events, and accounted for 89 of 97 steps. The gap was one manual run of a scheduled flow, which history can't see.</p>
   <p>Next, I want it to work from a rules file the admin exports and opens in their own browser, so no access to their site is shared. I haven't confirmed yet that the export contains everything it needs.</p>
 </section>
 

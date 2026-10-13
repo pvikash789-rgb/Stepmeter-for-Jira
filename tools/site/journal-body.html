@@ -72,7 +72,7 @@
     <thead><tr><th>Measure</th><th>Target</th><th>Actual</th></tr></thead>
     <tbody>
       <tr><td>Jira admins interviewed</td><td>3 to 5</td><td class="v">Not started</td></tr>
-      <tr><td>Estimate accuracy against real usage</td><td>Within ~20%</td><td class="v">56 of 57 steps on 17 runs, 7 flows (test site)</td></tr>
+      <tr><td>Estimate accuracy against real usage</td><td>Within ~20%</td><td class="v">Automated: run counts exact for all 7 event-driven flows; 89 of 97 steps (test site)</td></tr>
       <tr><td>Beta sites</td><td>5 to 10</td><td class="v">0</td></tr>
       <tr><td>Monthly savings found across beta sites</td><td>Report as found</td><td class="v">Not measured</td></tr>
     </tbody>
@@ -83,6 +83,14 @@
 <section aria-labelledby="journal">
   <h2 id="journal">Journal</h2>
   <div class="journal">
+    <article class="entry">
+      <div class="date">13 Oct 2026 · Day 5, afternoon</div>
+      <h3>A working prototype, checked against the Usage tab</h3>
+      <p>Built a command-line prototype that produces the waste report automatically. It reads each flow through the Automation Rule Management API, then counts the events that would have started it from each work item's change history since the flow was created: edits, label changes, status changes and new work items. Changes made by automation are skipped, because they don't start other flows by default. For flows that check labels, it uses the labels each work item had at the time to split runs that passed the check from runs that stopped.</p>
+      <p>Then I compared it with the Usage tab on the same afternoon. For all 7 flows that react to events, the run counts matched exactly. Steps matched for 5 of them, including the wasted steps: 6 of 15 on the broad flow and 3 of 11 on the flow that edits before checking.</p>
+      <p>The other two were both web request flows, and they explained the old mystery. A request that succeeded used 3 steps, the same as one that failed, so a web request counts as 2 steps, not 1. The model now uses that.</p>
+      <p>The remaining gap is the daily scheduled flow: the prototype assumes one run a day and counted 5, but it had run 6 times because I also ran it once by hand. Manual runs don't appear in work item history. After the web request fix, the prototype accounts for 89 of the site's 97 steps, and the 8-step gap is that one manual run.</p>
+    </article>
     <article class="entry">
       <div class="date">13 Oct 2026 · Day 5</div>
       <h3>A first demo report and a one-page brief</h3>

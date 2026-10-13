@@ -2,7 +2,7 @@
 
 Find which Jira and Confluence automation rules will cost the most under Atlassian's per-step billing, and how to rewrite them to cost less.
 
-**Status:** Phase 0, validating before building. Started 8 October 2026. In the test site, the step model matches Atlassian's count on 56 of 57 steps across 17 runs, and branches and scheduled searches are billed once per work item.
+**Status:** Working prototype. Started 8 October 2026. `phase1/stepmeter.py` reads a site's flows and work item history and writes a waste report. On the test site, it matched the Usage tab's run count for all 7 flows that react to events and accounted for 89 of 97 steps.
 
 **Build journal:** https://pvikash789-rgb.github.io/Stepmeter-for-Jira/
 
@@ -28,7 +28,7 @@ Secrets inside rules (webhook URLs, headers, tokens) are stripped before process
 | Phase | What | Status |
 |---|---|---|
 | 0 | Validate: API access (confirmed), what the product already shows (done), admin interviews | In progress |
-| 1 | Cost engine: parse rules, count steps, estimate run frequency, check accuracy | Next |
+| 1 | Cost engine: parse rules, count steps, estimate run frequency, check accuracy | Prototype working |
 | 2 | Recommendations and report | Planned |
 | 3 | Beta with 5 to 10 admins on their own sites | Planned |
 | 4 | Public release, before 3 December 2026 | Planned |
@@ -37,6 +37,8 @@ Secrets inside rules (webhook URLs, headers, tokens) are stripped before process
 
 - [`docs/`](docs/): the build journal and decision log, published with GitHub Pages
 - [`phase0/`](phase0/README.md): test rules, the API spike script and the admin interview guide
+- [`phase1/`](phase1/README.md): the working prototype that writes the waste report
+- [`tools/site/`](tools/site/README.md): templates for the public pages
 
 ## Run the Phase 0 spike
 
