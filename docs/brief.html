@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wasted Automation Steps Brief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column that fits on one long screen. Problem, test, findings, proposal with mockup, questions. */
+:root{
+  --bg:#f4f5f2; --surface:#ffffff; --fg:#1d2320; --muted:#5d6862; --line:#d9ded9;
+  --accent:#2e5c8a; --accent-soft:#e3ecf5; --waste:#a8462f; --waste-soft:#f7e5e0; --ok:#2c6b3f; --ok-soft:#e3f1e6; --mock:#fbfbfa;
+  --display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#131614; --surface:#1b201d; --fg:#e5e9e6; --muted:#9ca8a1; --line:#2d3530;
+  --accent:#8db8e3; --accent-soft:#1b2a3a; --waste:#ef9a85; --waste-soft:#36201b; --ok:#7fc994; --ok-soft:#18291d; --mock:#161a18; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15.5px;line-height:1.6}
+nav{max-width:780px;margin:0 auto;padding:16px 16px 0;font-family:var(--mono);font-size:.8rem}
+a{color:var(--accent);text-underline-offset:2px}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:780px;margin:0 auto;padding-inline:16px;padding-block:28px 72px;display:flex;flex-direction:column;gap:30px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.2;text-wrap:balance}
+h1{font-size:2.2rem;font-weight:600}
+h2{font-size:1.3rem;font-weight:600}
+p{margin:0;max-width:68ch}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+header,section{display:flex;flex-direction:column;gap:12px}
+.lede{font-size:1.06rem}
+ol,ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+li{max-width:68ch}
+.stat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:600px){.stat{grid-template-columns:1fr}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;min-width:0}
+.tile .n{font-family:var(--display);font-size:1.7rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.tile .l{font-size:.84rem;color:var(--muted)}
+.tile.w .n{color:var(--waste)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+th{font-family:var(--mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.yes{color:var(--ok);font-weight:500}
+.no{color:var(--waste);font-weight:500}
+.mock{border:1px dashed var(--muted);border-radius:8px;padding:14px;background:var(--mock);display:flex;flex-direction:column;gap:10px}
+.mock .cap{font-family:var(--mono);font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.mock table{background:var(--surface)}
+.new{background:var(--accent-soft)}
+.flag{display:inline-block;font-family:var(--mono);font-size:.72rem;padding:1px 7px;border-radius:99px;background:var(--waste-soft);color:var(--waste);margin:2px 4px 2px 0;white-space:nowrap}
+.note{font-size:.86rem;color:var(--muted)}
+.cta{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:4px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+</style>
+</head>
+<body>
+<nav><a href="index.html">Build journal</a> &middot; <a href="demo.html">Demo report</a> &middot; <a href="https://github.com/pvikash789-rgb/Stepmeter-for-Jira">Code on GitHub</a></nav>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">One-page brief · Vikash Kumar · October 2026</div>
+  <h1>Wasted steps in Jira automation</h1>
+  <p class="lede">From 3 December, every automation step has a price. Admins can already see which flows use the most steps. They can't see how many of those steps did nothing, why, or what to change.</p>
+</header>
+
+<section aria-labelledby="test">
+  <h2 id="test">What I tested</h2>
+  <p>I built a Jira test site with 9 automation flows, each built to show one cost pattern: a broad trigger, a narrow trigger, a branch over sub-tasks, a daily scheduled search, a failing web request, and a flow that edits before it checks. For every run, I wrote down a step prediction before the Usage tab reported it.</p>
+  <div class="stat">
+    <div class="tile"><div class="n">56 of 57</div><div class="l">steps predicted correctly, across 17 runs</div></div>
+    <div class="tile w"><div class="n">21%</div><div class="l">of all steps went to runs that did nothing or failed</div></div>
+    <div class="tile w"><div class="n">40%</div><div class="l">of one broad flow's steps did nothing</div></div>
+  </div>
+</section>
+
+<section aria-labelledby="found">
+  <h2 id="found">What I found</h2>
+  <ol>
+    <li><strong>Waste is easy to miss.</strong> A flow that starts on every update and then checks a label used 15 steps over 6 runs. 3 runs stopped at the check and did nothing, using 6 of the 15 steps. The Usage tab shows "15 steps" and nothing more.</li>
+    <li><strong>A badly ordered flow looks healthy.</strong> A flow that edits a work item before checking whether it should stopped at the check, used 3 steps, changed the item anyway, and its run was marked Success. Nothing tells the admin the flow is built in a costly way.</li>
+    <li><strong>Per-item cost is hard to trace.</strong> Branches and scheduled searches cost one step per work item. The audit log shows each action as one line, so an admin can't see where a flow's cost comes from. A daily search over 500 work items would use about 15,000 steps a month on its own.</li>
+  </ol>
+  <p class="note">Also seen: the Usage tab took about two hours to reflect new runs, and one failing web request counted 3 steps where 2 were expected (still investigating).</p>
+</section>
+
+<section aria-labelledby="gap">
+  <h2 id="gap">What admins can see today</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Question an admin asks</th><th>Usage tab today</th></tr></thead>
+    <tbody>
+      <tr><td>Which flows use the most steps?</td><td class="yes">Yes, ranked by flow</td></tr>
+      <tr><td>How many of those steps did nothing?</td><td class="no">No</td></tr>
+      <tr><td>Why is this flow expensive?</td><td class="no">No</td></tr>
+      <tr><td>What should I change, and what would it save?</td><td class="no">No</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section aria-labelledby="idea">
+  <h2 id="idea">One idea for the Usage tab</h2>
+  <p>Add one column and a few plain-language flags to the high usage flows table. The flags come from the flow's structure and its run outcomes, both of which Atlassian already has.</p>
+  <div class="mock" role="img" aria-label="Mockup of a usage table with a wasted steps column and flags">
+    <div class="cap">Mockup · not Atlassian's design · test-site numbers</div>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Flow</th><th>Runs</th><th>Steps</th><th class="new">Wasted</th><th class="new">Why</th></tr></thead>
+      <tbody>
+        <tr><td>03 noisy trigger</td><td class="num">6</td><td class="num">15</td><td class="num new">6 (40%)</td><td class="new"><span class="flag">Stops at first check on 3 of 6 runs</span><span class="flag">Narrower trigger available</span></td></tr>
+        <tr><td>15 condition last</td><td class="num">3</td><td class="num">11</td><td class="num new">3 (27%)</td><td class="new"><span class="flag">Edits before checking</span></td></tr>
+        <tr><td>11 webhook secret</td><td class="num">1</td><td class="num">3</td><td class="num new">3 (100%)</td><td class="new"><span class="flag">Fails every run</span></td></tr>
+        <tr><td>05 daily jql</td><td class="num">2</td><td class="num">16</td><td class="num new">0</td><td class="new"><span class="flag" style="background:var(--accent-soft);color:var(--accent)">1 step per matching item, daily</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="build">
+  <h2 id="build">What I'm building</h2>
+  <p><strong>Stepmeter</strong> is a small open-source tool that does this outside the product today: it reads each flow's structure and run results, shows the wasted steps per flow, explains the cause, and suggests a fix with its saving. The first version works on the test site: <a href="demo.html">see the demo report</a>.</p>
+  <p>Next, I want it to work from a rules file the admin exports and opens in their own browser, so no access to their site is shared. I haven't confirmed yet that the export contains everything it needs.</p>
+</section>
+
+<section class="cta" aria-labelledby="ask">
+  <h2 id="ask">Where I'd value your view</h2>
+  <ul>
+    <li>Do customers ask why their automation costs what it does, or how to reduce it?</li>
+    <li>Is wasted steps the right way to frame it, or is there a better measure?</li>
+    <li>What am I missing about how admins build and run flows at scale?</li>
+  </ul>
+</section>
+
+<p class="note">The method, every decision and the raw results are in the <a href="index.html">build journal</a> and <a href="decisions.html">decision log</a>. Not affiliated with Atlassian.</p>
+
+</div>
+</body>
+</html>

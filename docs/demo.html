@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stepmeter Demo Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: report header with site totals, then one card per flow, worst waste first. */
+:root{
+  --bg:#f4f5f2; --surface:#ffffff; --fg:#1d2320; --muted:#5d6862; --line:#d9ded9;
+  --accent:#2e5c8a; --accent-soft:#e3ecf5; --waste:#a8462f; --waste-soft:#f7e5e0; --ok:#2c6b3f; --ok-soft:#e3f1e6; --warn:#8a5a00; --warn-soft:#fbf0d9; --bar:#e6e9e6;
+  --display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#131614; --surface:#1b201d; --fg:#e5e9e6; --muted:#9ca8a1; --line:#2d3530;
+  --accent:#8db8e3; --accent-soft:#1b2a3a; --waste:#ef9a85; --waste-soft:#36201b; --ok:#7fc994; --ok-soft:#18291d; --warn:#e8b65c; --warn-soft:#2e2615; --bar:#2a312d; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15.5px;line-height:1.6}
+nav{max-width:900px;margin:0 auto;padding:16px 16px 0;font-family:var(--mono);font-size:.8rem}
+a{color:var(--accent);text-underline-offset:2px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:900px;margin:0 auto;padding-inline:16px;padding-block:28px 72px;display:flex;flex-direction:column;gap:32px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.2;text-wrap:balance}
+h1{font-size:2.2rem;font-weight:600}
+h2{font-size:1.35rem;font-weight:600}
+h3{font-size:1.1rem;font-weight:600}
+p{margin:0;max-width:70ch}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+header{display:flex;flex-direction:column;gap:10px}
+.note{font-size:.88rem;color:var(--muted)}
+.totals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:640px){.totals{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile .n{font-family:var(--display);font-size:1.9rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.tile .l{font-size:.82rem;color:var(--muted)}
+.tile.w .n{color:var(--waste)}
+.flows{display:flex;flex-direction:column;gap:14px}
+.flow{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.flow.hasw{border-left:3px solid var(--waste)}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.nums{font-family:var(--mono);font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.pill{font-family:var(--mono);font-size:.72rem;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.pill.w{background:var(--waste-soft);color:var(--waste)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.n{border:1px solid var(--line);color:var(--muted)}
+.chain{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-family:var(--mono);font-size:.78rem}
+.chip{border:1px solid var(--line);border-radius:4px;padding:2px 7px;background:var(--bg)}
+.chip.t{border-color:var(--accent);color:var(--accent)}
+.chip.c{border-style:dashed}
+.chip.b::before{content:"for each ";color:var(--muted)}
+.arrow{color:var(--muted)}
+.bar{height:10px;border-radius:5px;background:var(--bar);overflow:hidden;display:flex}
+.bar span{display:block;height:100%}
+.bar .u{background:var(--ok)}
+.bar .x{background:var(--waste)}
+.legend{display:flex;gap:14px;font-size:.8rem;color:var(--muted);flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.finding{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 14px;font-size:.93rem}
+@media (max-width:540px){.finding{grid-template-columns:1fr}}
+.finding dt{font-family:var(--mono);font-size:.78rem;color:var(--muted);padding-top:2px}
+.finding dd{margin:0}
+dl{margin:0}
+.method{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+</style>
+</head>
+<body>
+<nav><a href="index.html">Build journal</a> &middot; <a href="brief.html">One-page brief</a> &middot; <a href="https://github.com/pvikash789-rgb/Stepmeter-for-Jira">Code on GitHub</a></nav>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Stepmeter for Jira · Demo report · Test site</div>
+  <h1>Where this site's automation steps go</h1>
+  <p>A first version of the report Stepmeter will give admins. It reads each flow's structure and its run results, then shows how many steps did useful work, how many went to runs that did nothing or failed, what caused it, and what to change.</p>
+  <p class="note">Data: the Stepmeter test site, 8 flows (a ninth, added after this snapshot, is left out). Step totals from the Automation Usage tab on 9 Oct 2026, 9:37 AM. Run outcomes from the audit log. Flow structure read through the Automation Rule Management API.</p>
+</header>
+
+<section aria-labelledby="t" class="totals" id="totals"></section>
+
+<section aria-labelledby="flows-h" style="display:flex;flex-direction:column;gap:14px">
+  <h2 id="flows-h">Flows, most wasted steps first</h2>
+  <div class="legend"><span><i style="background:var(--ok)"></i>Steps that did the flow's job</span><span><i style="background:var(--waste)"></i>Steps on runs that did nothing or failed</span></div>
+  <div class="flows" id="flows"></div>
+</section>
+
+<section class="method" aria-labelledby="m">
+  <h2 id="m">How the numbers are worked out</h2>
+  <ul>
+    <li>Each trigger, condition, action and branch that runs is one step. Inside a branch or a scheduled search, actions count once per work item. This matched the Usage tab on 56 of 57 steps in the test site.</li>
+    <li>A run counts as wasted when it stopped at a condition before doing the flow's job, or when its main action failed.</li>
+    <li>Fixes are found from the flow's structure: a broad trigger followed by a filter, work done before a check, a search that touches every match every day, a flow that fails every time.</li>
+    <li>Savings are what the same runs would have cost after the fix. Event-driven flows aren't projected to a month, because that depends on how often a site's work items change.</li>
+    <li>Flow 11 counted 3 steps for a run where the model expects 2. This is still being investigated.</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+// Test-site data. Steps per run follow the step model; totals match the Usage tab (9 Oct, 9:37 AM).
+const flows = [
+  { id:"01", name:"01 simple event", enabled:true,
+    trigger:{label:"Work item created", broad:false}, chain:[{k:"a",l:"Assign to reporter"}],
+    runs:[{o:"done",s:2},{o:"done",s:2}] },
+  { id:"03", name:"03 noisy trigger", enabled:true,
+    trigger:{label:"Work item updated (any field)", broad:true}, chain:[{k:"c",l:"Labels contain vip"},{k:"a",l:"Add comment"}],
+    runs:[{o:"done",s:3},{o:"stopped",s:2},{o:"stopped",s:2},{o:"done",s:3},{o:"done",s:3},{o:"stopped",s:2}] },
+  { id:"04", name:"04 field change narrow", enabled:true,
+    trigger:{label:"Labels changed", broad:false}, chain:[{k:"a",l:"Add comment"}],
+    runs:[{o:"done",s:2},{o:"done",s:2}] },
+  { id:"05", name:"05 daily jql", enabled:true,
+    trigger:{label:"Daily search: In Progress items", broad:false, scheduled:true, perRun:7}, chain:[{k:"a",l:"Add comment (each item)"}],
+    runs:[{o:"done",s:8},{o:"done",s:8}] },
+  { id:"07", name:"07 subtask branch", enabled:true,
+    trigger:{label:"Work item moved to Done", broad:false}, chain:[{k:"b",l:"sub-task",children:[{k:"a",l:"Move to Done"}]}],
+    runs:[{o:"done",s:4,items:2}] },
+  { id:"11", name:"11 webhook secret", enabled:true,
+    trigger:{label:"Work item created", broad:false}, chain:[{k:"a",l:"Send web request"}],
+    runs:[{o:"failed",s:3}] },
+  { id:"15", name:"15 condition last", enabled:true,
+    trigger:{label:"Work item updated (any field)", broad:true}, chain:[{k:"a",l:"Edit description"},{k:"c",l:"Labels contain vip"},{k:"a",l:"Add comment"}],
+    runs:[{o:"done",s:4},{o:"done",s:4},{o:"stopped",s:3}] },
+  { id:"16", name:"16 disabled", enabled:false,
+    trigger:{label:"Work item created", broad:false}, chain:[{k:"a",l:"Add comment"}], runs:[] }
+];
+
+// Find causes and fixes from structure and outcomes.
+function analyse(f){
+  const total = f.runs.reduce((a,r)=>a+r.s,0);
+  const wasted = f.runs.filter(r=>r.o!=="done").reduce((a,r)=>a+r.s,0);
+  const stopped = f.runs.filter(r=>r.o==="stopped").length;
+  const failed = f.runs.filter(r=>r.o==="failed").length;
+  const firstCond = f.chain.findIndex(c=>c.k==="c");
+  const actionBeforeCond = firstCond>0 && f.chain.slice(0,firstCond).some(c=>c.k==="a");
+  const out = {total, wasted, cause:null, fix:null, saving:null, tag:null};
+  if(!f.enabled){ out.cause="Turned off, so it uses no steps."; out.tag="n"; return out; }
+  if(failed && failed===f.runs.length){
+    out.cause=`Every run failed (${failed} of ${f.runs.length}). The request is rejected, but the run still uses steps.`;
+    out.fix="Fix the request or turn the flow off. A flow that always fails pays for every run and does nothing.";
+    out.saving=`${wasted} of ${total} steps`; out.tag="w"; return out;
+  }
+  if(actionBeforeCond){
+    out.cause=`It edits the work item before checking whether it should. ${stopped} run${stopped===1?"":"s"} stopped at the check after the edit had already happened, and the audit log still marked ${stopped===1?"it":"them"} Success.`;
+    out.fix="Move the label check above the edit. Runs that stop would cost one step less and wouldn't change the work item. Going further, a trigger on the field that matters (as in flow 04) would stop most of these runs from starting.";
+    out.saving=`${stopped} step${stopped===1?"":"s"} on these runs, plus the unwanted edits`; out.tag="w"; return out;
+  }
+  if(f.trigger.broad && firstCond===0 && stopped){
+    out.cause=`It starts on every change to any work item, then a label check stops most runs. ${stopped} of ${f.runs.length} runs did nothing.`;
+    out.fix="If the flow only needs to react to label changes, trigger on that field (Labels changed), as flow 04 does. Runs that would stop at the check then never start. If it really must check every update, the waste is the price of that choice, and the report makes it visible.";
+    out.saving=`${wasted} of ${total} steps`; out.tag="w"; return out;
+  }
+  if(f.trigger.scheduled){
+    const perDay = 1 + f.trigger.perRun;
+    out.cause=`Costs one step for the search plus one per matching work item, every day: ${perDay} a day, about ${perDay*30} a month with today's ${f.trigger.perRun} matches. It comments on the same items again even if nothing changed.`;
+    out.fix="Only act on items changed since the last run (an option on the scheduled trigger), or narrow the search. With 500 matches, the same flow would use about 15,000 steps a month.";
+    out.saving="Depends on how many items change each day"; out.tag="n"; return out;
+  }
+  if(f.chain.some(c=>c.k==="b")){
+    out.cause="Each sub-task costs a step, so the cost grows with the number of sub-tasks. This run moved 2 sub-tasks for 4 steps.";
+    out.fix="Fine as built. Worth a check inside the branch if many sub-tasks are usually already done.";
+    out.tag="ok"; return out;
+  }
+  out.cause="Every run did its job."; out.tag="ok"; return out;
+}
+
+const rows = flows.map(f=>({f, a:analyse(f)})).sort((x,y)=>y.a.wasted-x.a.wasted || y.a.total-x.a.total);
+const T = rows.reduce((a,r)=>a+r.a.total,0), W = rows.reduce((a,r)=>a+r.a.wasted,0);
+const runs = flows.reduce((a,f)=>a+f.runs.length,0);
+const flagged = rows.filter(r=>r.a.tag==="w").length;
+const tiles = [[T,"steps used"],[W,"steps on runs that did nothing or failed",true],[Math.round(W/T*100)+"%","of all steps wasted",true],[flagged+" of 8","flows with a fix that cuts waste"]];
+document.getElementById("totals").innerHTML = tiles.map(([n,l,w])=>`<div class="tile${w?" w":""}"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("");
+
+const esc = s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function chainHTML(f){
+  const parts=[`<span class="chip t">${esc(f.trigger.label)}</span>`];
+  f.chain.forEach(c=>{
+    parts.push('<span class="arrow" aria-hidden="true">&rarr;</span>');
+    if(c.k==="b"){ parts.push(`<span class="chip b">${esc(c.l)}</span>`); c.children.forEach(ch=>{parts.push('<span class="arrow" aria-hidden="true">&rarr;</span>');parts.push(`<span class="chip">${esc(ch.l)}</span>`);}); }
+    else parts.push(`<span class="chip${c.k==="c"?" c":""}">${c.k==="c"?"if ":""}${esc(c.l)}</span>`);
+  });
+  return parts.join("");
+}
+document.getElementById("flows").innerHTML = rows.map(({f,a})=>{
+  const pct = a.total? Math.round(a.wasted/a.total*100):0;
+  const pill = a.tag==="w"?`<span class="pill w">${pct}% wasted</span>`:a.tag==="ok"?`<span class="pill ok">No waste</span>`:`<span class="pill n">${f.enabled?"Check":"Off"}</span>`;
+  const useful = a.total? (a.total-a.wasted)/a.total*100:0, waste = a.total? a.wasted/a.total*100:0;
+  return `<article class="flow${a.tag==="w"?" hasw":""}">
+    <div class="top"><h3>${esc(f.name)}</h3><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="nums">${f.runs.length} run${f.runs.length===1?"":"s"} · ${a.total} steps · ${a.wasted} wasted</span>${pill}</div></div>
+    <div class="chain">${chainHTML(f)}</div>
+    ${a.total?`<div class="bar" role="img" aria-label="${a.total-a.wasted} useful steps, ${a.wasted} wasted"><span class="u" style="width:${useful}%"></span><span class="x" style="width:${waste}%"></span></div>`:""}
+    <dl class="finding"><dt>What's happening</dt><dd>${esc(a.cause)}</dd>${a.fix?`<dt>Fix</dt><dd>${esc(a.fix)}</dd>`:""}${a.saving?`<dt>Saving</dt><dd>${esc(a.saving)}</dd>`:""}</dl>
+  </article>`;
+}).join("");
+</script>
+</body>
+</html>
